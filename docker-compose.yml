@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: docsourcing-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: docsourcing
+      POSTGRES_PASSWORD: docsourcing
+      POSTGRES_DB: docsourcing
+    ports:
+      - "5432:5432"
+    volumes:
+      - docsourcing_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docsourcing -d docsourcing"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  docsourcing_pgdata:
