@@ -1,0 +1,17 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e4]:
+        - heading "DocSourcing" [level=1] [ref=e5]
+        - paragraph [ref=e6]: Event-sourced document collaboration — offline-first.
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - textbox "New document title" [ref=e9]
+          - button "Create" [active] [ref=e10] [cursor=pointer]
+        - list [ref=e22]:
+          - listitem [ref=e23]:
+            - link "Bug3" [ref=e24] [cursor=pointer]:
+              - /url: /doc/2c733f2c-74f6-473f-aff9-3fd6116d45e1
+  - button "Open Next.js Dev Tools" [ref=e17] [cursor=pointer]:
+    - img [ref=e18]
+  - alert [ref=e21]

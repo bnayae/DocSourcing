@@ -20,6 +20,9 @@ const KNOWN_TYPES = new Set<DocumentEventType>([
   'TEXT_INSERTED',
   'TEXT_DELETED',
   'DOCUMENT_ARCHIVED',
+  'FIX',
+  'CORRECTION',
+  'OVERRIDE',
 ]);
 
 function isEvent(x: unknown): x is DocumentEvent {

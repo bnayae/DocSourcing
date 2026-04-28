@@ -3,10 +3,7 @@ import {
   type DocumentState,
   emptyDocumentState,
 } from './types';
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
-}
+import { applyDelete, applyInsert } from './anchors';
 
 function applyEvent(state: DocumentState, event: DocumentEvent): DocumentState {
   switch (event.type) {
@@ -30,23 +27,24 @@ function applyEvent(state: DocumentState, event: DocumentEvent): DocumentState {
       };
 
     case 'TEXT_INSERTED': {
-      const pos = clamp(event.payload.position, 0, state.body.length);
-      const body = state.body.slice(0, pos) + event.payload.text + state.body.slice(pos);
+      const { beforeSentence, afterSentence, text } = event.payload;
+      const next = applyInsert(state.body, beforeSentence, afterSentence, text);
+      // If anchors are missing in local state we still advance lastSeq so the
+      // log stays monotonic; the body just doesn't change.
       return {
         ...state,
-        body,
+        body: next ?? state.body,
         lastSeq: Math.max(state.lastSeq, event.sequenceNumber),
         lastEventAt: Math.max(state.lastEventAt, event.createdAt),
       };
     }
 
     case 'TEXT_DELETED': {
-      const pos = clamp(event.payload.position, 0, state.body.length);
-      const len = clamp(event.payload.length, 0, state.body.length - pos);
-      const body = state.body.slice(0, pos) + state.body.slice(pos + len);
+      const { beforeSentence, afterSentence, text } = event.payload;
+      const next = applyDelete(state.body, beforeSentence, afterSentence, text);
       return {
         ...state,
-        body,
+        body: next ?? state.body,
         lastSeq: Math.max(state.lastSeq, event.sequenceNumber),
         lastEventAt: Math.max(state.lastEventAt, event.createdAt),
       };
@@ -56,6 +54,27 @@ function applyEvent(state: DocumentState, event: DocumentEvent): DocumentState {
       return {
         ...state,
         isArchived: true,
+        lastSeq: Math.max(state.lastSeq, event.sequenceNumber),
+        lastEventAt: Math.max(state.lastEventAt, event.createdAt),
+      };
+
+    case 'FIX':
+    case 'CORRECTION': {
+      // Same anchored-insert semantics as TEXT_INSERTED.
+      const { beforeSentence, afterSentence, text } = event.payload;
+      const next = applyInsert(state.body, beforeSentence, afterSentence, text);
+      return {
+        ...state,
+        body: next ?? state.body,
+        lastSeq: Math.max(state.lastSeq, event.sequenceNumber),
+        lastEventAt: Math.max(state.lastEventAt, event.createdAt),
+      };
+    }
+
+    case 'OVERRIDE':
+      return {
+        ...state,
+        body: event.payload.replacementText,
         lastSeq: Math.max(state.lastSeq, event.sequenceNumber),
         lastEventAt: Math.max(state.lastEventAt, event.createdAt),
       };
@@ -72,5 +91,23 @@ export function computeStateFromEvents(
   events: readonly DocumentEvent[],
 ): DocumentState {
   const ordered = [...events].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
-  return ordered.reduce(applyEvent, emptyDocumentState(aggregateId));
+  // Collect every event id mentioned by any OVERRIDE event's undone list.
+  // These are still in the log (immutable) but contribute nothing to state.
+  const undone = new Set<string>();
+  for (const e of ordered) {
+    if (e.type === 'OVERRIDE') {
+      for (const id of e.payload.undoneEventIds) undone.add(id);
+    }
+  }
+  return ordered.reduce<DocumentState>((state, e) => {
+    if (undone.has(e.id)) {
+      // Still bump bookkeeping so lastSeq/lastEventAt stay monotonic.
+      return {
+        ...state,
+        lastSeq: Math.max(state.lastSeq, e.sequenceNumber),
+        lastEventAt: Math.max(state.lastEventAt, e.createdAt),
+      };
+    }
+    return applyEvent(state, e);
+  }, emptyDocumentState(aggregateId));
 }

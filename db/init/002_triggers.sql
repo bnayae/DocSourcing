@@ -34,24 +34,148 @@ BEGIN
       state := jsonb_set(state, '{title}', to_jsonb(COALESCE(ev_payload->>'title', '')), true);
 
     WHEN 'TEXT_INSERTED' THEN
-      pos := GREATEST(0, LEAST(length(body), COALESCE((ev_payload->>'position')::int, length(body))));
-      ins := COALESCE(ev_payload->>'text', '');
-      body := substr(body, 1, pos) || ins || substr(body, pos + 1);
-      state := jsonb_set(state, '{body}', to_jsonb(body), true);
+      DECLARE
+        bsent TEXT := COALESCE(ev_payload->>'beforeSentence', '');
+        asent TEXT := COALESCE(ev_payload->>'afterSentence', '');
+        ins_text TEXT := COALESCE(ev_payload->>'text', '');
+        joined TEXT;
+        first_idx INT;
+        second_idx INT;
+        cut INT;
+      BEGIN
+        IF bsent = '' AND asent = '' THEN
+          IF length(body) = 0 THEN
+            body := ins_text;
+          END IF;
+        ELSIF bsent = '' THEN
+          IF position(asent IN body) = 1 THEN
+            body := ins_text || body;
+          END IF;
+        ELSIF asent = '' THEN
+          IF right(body, length(bsent)) = bsent THEN
+            body := body || ins_text;
+          END IF;
+        ELSE
+          joined := bsent || asent;
+          first_idx := position(joined IN body);
+          IF first_idx > 0 THEN
+            second_idx := position(joined IN substr(body, first_idx + 1));
+            IF second_idx = 0 THEN
+              cut := first_idx - 1 + length(bsent);
+              body := substr(body, 1, cut) || ins_text || substr(body, cut + 1);
+            END IF;
+          END IF;
+        END IF;
+        state := jsonb_set(state, '{body}', to_jsonb(body), true);
+      END;
 
     WHEN 'TEXT_DELETED' THEN
-      pos := GREATEST(0, LEAST(length(body), COALESCE((ev_payload->>'position')::int, 0)));
-      len := GREATEST(0, LEAST(length(body) - pos, COALESCE((ev_payload->>'length')::int, 0)));
-      body := substr(body, 1, pos) || substr(body, pos + len + 1);
-      state := jsonb_set(state, '{body}', to_jsonb(body), true);
+      DECLARE
+        bsent TEXT := COALESCE(ev_payload->>'beforeSentence', '');
+        asent TEXT := COALESCE(ev_payload->>'afterSentence', '');
+        del_text TEXT := COALESCE(ev_payload->>'text', '');
+        joined TEXT;
+        first_idx INT;
+        second_idx INT;
+        cut INT;
+      BEGIN
+        IF length(del_text) > 0 THEN
+          joined := bsent || del_text || asent;
+          first_idx := position(joined IN body);
+          IF first_idx > 0 THEN
+            second_idx := position(joined IN substr(body, first_idx + 1));
+            IF second_idx = 0 THEN
+              cut := first_idx - 1 + length(bsent);
+              body := substr(body, 1, cut) || substr(body, cut + length(del_text) + 1);
+            END IF;
+          END IF;
+        END IF;
+        state := jsonb_set(state, '{body}', to_jsonb(body), true);
+      END;
 
     WHEN 'DOCUMENT_ARCHIVED' THEN
       state := jsonb_set(state, '{isArchived}', to_jsonb(true), true);
+
+    WHEN 'FIX', 'CORRECTION' THEN
+      -- Same anchored insert semantics as TEXT_INSERTED.
+      DECLARE
+        bsent TEXT := COALESCE(ev_payload->>'beforeSentence', '');
+        asent TEXT := COALESCE(ev_payload->>'afterSentence', '');
+        ins_text TEXT := COALESCE(ev_payload->>'text', '');
+        joined TEXT;
+        first_idx INT;
+        second_idx INT;
+        cut INT;
+      BEGIN
+        IF bsent = '' AND asent = '' THEN
+          IF length(body) = 0 THEN body := ins_text; END IF;
+        ELSIF bsent = '' THEN
+          IF position(asent IN body) = 1 THEN body := ins_text || body; END IF;
+        ELSIF asent = '' THEN
+          IF right(body, length(bsent)) = bsent THEN body := body || ins_text; END IF;
+        ELSE
+          joined := bsent || asent;
+          first_idx := position(joined IN body);
+          IF first_idx > 0 THEN
+            second_idx := position(joined IN substr(body, first_idx + 1));
+            IF second_idx = 0 THEN
+              cut := first_idx - 1 + length(bsent);
+              body := substr(body, 1, cut) || ins_text || substr(body, cut + 1);
+            END IF;
+          END IF;
+        END IF;
+        state := jsonb_set(state, '{body}', to_jsonb(body), true);
+      END;
+
+    WHEN 'OVERRIDE' THEN
+      -- OVERRIDE replaces the body wholesale. The undone events stay in the
+      -- log; the AFTER-INSERT trigger handles re-folding so undone events
+      -- don't contribute again on subsequent reads.
+      state := jsonb_set(state, '{body}', to_jsonb(COALESCE(ev_payload->>'replacementText', '')), true);
 
     ELSE
       -- Unknown event type: leave state unchanged so we don't poison the aggregate.
       RETURN state;
   END CASE;
+
+  RETURN state;
+END;
+$$;
+
+-- Recompute an aggregate's state by folding every event for it from scratch,
+-- honoring the union of all OVERRIDE.undoneEventIds (those events contribute
+-- nothing to state but stay in the log).
+CREATE OR REPLACE FUNCTION docsourcing_recompute_aggregate(agg_id UUID)
+RETURNS JSONB
+LANGUAGE plpgsql
+STABLE
+AS $$
+DECLARE
+  state    JSONB := '{}'::jsonb;
+  undone   TEXT[] := ARRAY[]::TEXT[];
+  ev       RECORD;
+BEGIN
+  -- First pass: collect every event id mentioned by any OVERRIDE.
+  FOR ev IN
+    SELECT payload
+    FROM documents_events
+    WHERE aggregate_id = agg_id AND type = 'OVERRIDE'
+  LOOP
+    undone := undone || ARRAY(SELECT jsonb_array_elements_text(ev.payload->'undoneEventIds'));
+  END LOOP;
+
+  -- Second pass: fold every event in seq order, skipping undone ones.
+  FOR ev IN
+    SELECT id, type, payload
+    FROM documents_events
+    WHERE aggregate_id = agg_id
+    ORDER BY sequence_number ASC
+  LOOP
+    IF ev.id::text = ANY(undone) THEN
+      CONTINUE;
+    END IF;
+    state := docsourcing_fold_event(state, ev.type, ev.payload);
+  END LOOP;
 
   RETURN state;
 END;
@@ -88,7 +212,14 @@ BEGIN
     new_last_event := GREATEST(existing.last_event_at, NEW.created_at);
   END IF;
 
-  next_state := docsourcing_fold_event(prev_state, NEW.type, NEW.payload);
+  IF NEW.type = 'OVERRIDE' THEN
+    -- OVERRIDE invalidates earlier events listed in undoneEventIds — those
+    -- events were already folded into `existing`. Recompute from scratch so
+    -- their contribution is removed.
+    next_state := docsourcing_recompute_aggregate(NEW.aggregate_id);
+  ELSE
+    next_state := docsourcing_fold_event(prev_state, NEW.type, NEW.payload);
+  END IF;
 
   -- Throttled snapshot: write the PRIOR state before mutating the aggregate, if enough time has passed.
   IF FOUND THEN
