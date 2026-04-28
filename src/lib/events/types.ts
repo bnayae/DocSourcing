@@ -17,12 +17,12 @@ export interface DocumentRenamedEvent extends BaseEventFields {
 
 export interface TextInsertedEvent extends BaseEventFields {
   type: 'TEXT_INSERTED';
-  payload: { position: number; text: string };
+  payload: { beforeSentence: string; afterSentence: string; text: string };
 }
 
 export interface TextDeletedEvent extends BaseEventFields {
   type: 'TEXT_DELETED';
-  payload: { position: number; length: number };
+  payload: { beforeSentence: string; afterSentence: string; text: string };
 }
 
 export interface DocumentArchivedEvent extends BaseEventFields {
@@ -30,12 +30,48 @@ export interface DocumentArchivedEvent extends BaseEventFields {
   payload: Record<string, never>;
 }
 
+/**
+ * Auto-merge event emitted when an OCC conflict has no overlap. Same shape
+ * as TEXT_INSERTED — kept as a distinct type so the timeline shows that the
+ * change came from automatic conflict resolution, not direct user input.
+ */
+export interface FixEvent extends BaseEventFields {
+  type: 'FIX';
+  payload: { beforeSentence: string; afterSentence: string; text: string };
+}
+
+/**
+ * User-resolved partial edit emitted from the conflict modal "Resolve" path.
+ * Same shape as TEXT_INSERTED, distinct type for provenance.
+ */
+export interface CorrectionEvent extends BaseEventFields {
+  type: 'CORRECTION';
+  payload: { beforeSentence: string; afterSentence: string; text: string };
+}
+
+/**
+ * Override event: the user has chosen to keep their version on top of
+ * the server's events. Records the local pending event IDs that this
+ * override supersedes and the full replacement body. Reducer treats the
+ * listed IDs as no-ops when folding and sets `body` to `replacementText`.
+ *
+ * Events are immutable — the undone events stay in the log, they're just
+ * skipped during state derivation.
+ */
+export interface OverrideEvent extends BaseEventFields {
+  type: 'OVERRIDE';
+  payload: { undoneEventIds: string[]; replacementText: string };
+}
+
 export type DocumentEvent =
   | DocumentCreatedEvent
   | DocumentRenamedEvent
   | TextInsertedEvent
   | TextDeletedEvent
-  | DocumentArchivedEvent;
+  | DocumentArchivedEvent
+  | FixEvent
+  | CorrectionEvent
+  | OverrideEvent;
 
 export type DocumentEventType = DocumentEvent['type'];
 

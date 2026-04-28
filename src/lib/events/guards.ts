@@ -1,8 +1,11 @@
 import type {
+  CorrectionEvent,
   DocumentArchivedEvent,
   DocumentCreatedEvent,
   DocumentEvent,
   DocumentRenamedEvent,
+  FixEvent,
+  OverrideEvent,
   TextDeletedEvent,
   TextInsertedEvent,
 } from './types';
@@ -21,3 +24,8 @@ export const isTextDeleted = (e: DocumentEvent): e is TextDeletedEvent =>
 
 export const isDocumentArchived = (e: DocumentEvent): e is DocumentArchivedEvent =>
   e.type === 'DOCUMENT_ARCHIVED';
+
+export const isFix = (e: DocumentEvent): e is FixEvent => e.type === 'FIX';
+export const isCorrection = (e: DocumentEvent): e is CorrectionEvent =>
+  e.type === 'CORRECTION';
+export const isOverride = (e: DocumentEvent): e is OverrideEvent => e.type === 'OVERRIDE';

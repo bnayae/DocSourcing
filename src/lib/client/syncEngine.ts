@@ -10,6 +10,7 @@ import {
 } from '@/lib/events/policies';
 import { bumpRetry, parkEvent } from './store';
 import { handleBatchResponse } from './conflictRouting';
+import { broadcastRemoteEventsAvailable } from '@/hooks/useRemoteEventSync';
 
 type SyncListener = (syncedIds: string[]) => void;
 
@@ -46,6 +47,7 @@ export class SyncEngine {
   private running = false;
   private stopped = true;
   private isOnline = true;
+  private paused = false;
   private transientFailures = 0;
   private firstFailureAt: number | null = null;
   private backoffMs = 1000;
@@ -71,13 +73,27 @@ export class SyncEngine {
     if (!was && value) this.kick();
   }
 
+  pause(): void {
+    this.paused = true;
+  }
+
+  resume(): void {
+    if (!this.paused) return;
+    this.paused = false;
+    this.kick();
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
   onSyncComplete(fn: SyncListener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
 
   kick(): void {
-    if (this.running || this.stopped || !this.isOnline) return;
+    if (this.running || this.stopped || !this.isOnline || this.paused) return;
     void this.loop();
   }
 
@@ -93,7 +109,7 @@ export class SyncEngine {
     if (this.running || this.stopped) return;
     this.running = true;
     try {
-      while (!this.stopped && this.isOnline) {
+      while (!this.stopped && this.isOnline && !this.paused) {
         const nextAggregate = await this.pickNextAggregate();
         if (!nextAggregate) break;
 
@@ -124,6 +140,12 @@ export class SyncEngine {
 
         for (const a of serverResponse.accepted) {
           this.emit([a.id]);
+        }
+
+        // Wake up sibling tabs (same browser) so they ingest right away
+        // instead of waiting for the next 10s poll.
+        if (serverResponse.accepted.length > 0) {
+          broadcastRemoteEventsAvailable(nextAggregate);
         }
 
         if (result.hardBlocked) continue;

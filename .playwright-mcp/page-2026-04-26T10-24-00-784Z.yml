@@ -1,0 +1,37 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e6] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e7]:
+      - img [ref=e8]
+    - generic [ref=e11]:
+      - button "Open issues overlay" [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: "0"
+          - generic [ref=e15]: "1"
+        - generic [ref=e16]: Issue
+      - button "Collapse issues badge" [ref=e17]:
+        - img [ref=e18]
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - navigation [ref=e22]:
+        - link "← All documents" [ref=e23] [cursor=pointer]:
+          - /url: /
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - textbox "Untitled" [ref=e27]
+            - generic [ref=e28]: All synced
+            - button "Simulate Offline" [ref=e29] [cursor=pointer]
+            - generic "Maximum characters captured before/after each text edit as anchors. Smaller = lighter events but more conflict-prone." [ref=e30]:
+              - text: "Anchor chars:"
+              - spinbutton "Anchor chars:" [ref=e31]: "80"
+            - button "Archive" [ref=e32] [cursor=pointer]
+          - generic [ref=e33]:
+            - textbox [ref=e34]
+            - button "Start dictation" [ref=e35] [cursor=pointer]: 🎤
+          - generic [ref=e36]: Loading…
+        - complementary [ref=e37]:
+          - generic [ref=e38]:
+            - strong [ref=e39]: Event log
+            - button "Live" [disabled] [ref=e40]
+          - generic [ref=e41]: No events yet.
+  - alert [ref=e42]

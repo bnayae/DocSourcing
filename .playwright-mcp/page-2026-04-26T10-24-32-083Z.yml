@@ -1,0 +1,65 @@
+- generic [ref=e1]:
+  - generic [ref=e6] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e7]:
+      - img [ref=e8]
+    - generic [ref=e11]:
+      - button "Open issues overlay" [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: "0"
+          - generic [ref=e15]: "1"
+        - generic [ref=e16]: Issue
+      - button "Collapse issues badge" [ref=e17]:
+        - img [ref=e18]
+  - main [ref=e20]:
+    - generic [ref=e21]:
+      - navigation [ref=e22]:
+        - link "← All documents" [ref=e23] [cursor=pointer]:
+          - /url: /
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - textbox "Untitled" [ref=e27]: Bug2
+            - generic [ref=e28]: All synced
+            - button "Simulate Offline" [ref=e29] [cursor=pointer]
+            - generic "Maximum characters captured before/after each text edit as anchors. Smaller = lighter events but more conflict-prone." [ref=e30]:
+              - text: "Anchor chars:"
+              - spinbutton "Anchor chars:" [ref=e31]: "80"
+            - button "Archive" [ref=e32] [cursor=pointer]
+          - generic [ref=e33]:
+            - textbox [active] [ref=e34]: first second third
+            - button "Start dictation" [ref=e35] [cursor=pointer]: 🎤
+          - generic [ref=e36]: Confirmed seq 4 · display seq 4 · server seq 4
+        - complementary [ref=e37]:
+          - generic [ref=e38]:
+            - strong [ref=e39]: Event log
+            - button "Live" [disabled] [ref=e40]
+          - list [ref=e43]:
+            - listitem [ref=e44]:
+              - button "#1 synced created \"Bug2\" 1:23:55 PM" [ref=e45] [cursor=pointer]:
+                - generic [ref=e46]:
+                  - generic [ref=e47]: "#1"
+                  - generic [ref=e48]: synced
+                - generic [ref=e49]: created "Bug2"
+                - generic [ref=e50]: 1:23:55 PM
+            - listitem [ref=e51]:
+              - button "#2 synced insert \"first\" 1:24:08 PM" [ref=e52] [cursor=pointer]:
+                - generic [ref=e53]:
+                  - generic [ref=e54]: "#2"
+                  - generic [ref=e55]: synced
+                - generic [ref=e56]: insert "first"
+                - generic [ref=e57]: 1:24:08 PM
+            - listitem [ref=e58]:
+              - button "#3 synced insert \" second\" 1:24:20 PM" [ref=e59] [cursor=pointer]:
+                - generic [ref=e60]:
+                  - generic [ref=e61]: "#3"
+                  - generic [ref=e62]: synced
+                - generic [ref=e63]: insert " second"
+                - generic [ref=e64]: 1:24:20 PM
+            - listitem [ref=e65]:
+              - button "#4 synced insert \" third\" 1:24:30 PM" [ref=e66] [cursor=pointer]:
+                - generic [ref=e67]:
+                  - generic [ref=e68]: "#4"
+                  - generic [ref=e69]: synced
+                - generic [ref=e70]: insert " third"
+                - generic [ref=e71]: 1:24:30 PM
+  - alert [ref=e42]

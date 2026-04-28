@@ -37,6 +37,18 @@ export class DocDB extends Dexie {
         'id, aggregateId, createdAt, sequenceNumber, status, [aggregateId+sequenceNumber]',
       eventInvestigation: 'id, aggregateId, parkedAt',
     });
+    // v2: switched TEXT_INSERTED/TEXT_DELETED to anchor-based payloads.
+    // The old position-based events are incompatible, so wipe both stores.
+    this.version(2)
+      .stores({
+        events:
+          'id, aggregateId, createdAt, sequenceNumber, status, [aggregateId+sequenceNumber]',
+        eventInvestigation: 'id, aggregateId, parkedAt',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('events').clear();
+        await tx.table('eventInvestigation').clear();
+      });
   }
 }
 
